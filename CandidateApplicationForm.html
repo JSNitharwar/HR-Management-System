@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Career Application</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      overflow: hidden;
+    }
+    
+    .header {
+      background: #00796B;
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+    
+    .header h1 { font-size: 24px; margin-bottom: 10px; }
+    .header p { opacity: 0.9; }
+    
+    .form-container { padding: 30px; }
+    
+    .job-card {
+      background: #E0F2F1;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 25px;
+    }
+    
+    .job-card h3 { color: #00796B; margin-bottom: 10px; font-size: 20px; }
+    .job-card p { margin: 5px 0; color: #555; font-size: 14px; }
+    
+    .job-tag {
+      display: inline-block;
+      background: #00796B;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 15px;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+    
+    .jobs-list {
+      display: grid;
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+    
+    .job-option {
+      border: 2px solid #ddd;
+      border-radius: 10px;
+      padding: 15px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .job-option:hover { border-color: #00796B; }
+    .job-option.selected { border-color: #00796B; background: #E0F2F1; }
+    
+    .job-option h4 { color: #333; margin-bottom: 5px; font-size: 16px; }
+    .job-option p { color: #666; font-size: 13px; }
+    
+    .section-title {
+      font-size: 18px;
+      color: #333;
+      margin: 25px 0 15px 0;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #00796B;
+    }
+    
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+    
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+    
+    .form-group { display: flex; flex-direction: column; }
+    .form-group.full-width { grid-column: 1 / -1; }
+    
+    .form-group label {
+      font-weight: 500;
+      color: #555;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+    
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #00796B;
+    }
+    
+    .resume-upload {
+      border: 2px dashed #00796B;
+      border-radius: 10px;
+      padding: 30px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 10px;
+    }
+    
+    .resume-upload:hover { background: #E0F2F1; }
+    
+    .resume-upload i { font-size: 48px; color: #00796B; }
+    .resume-upload p { color: #666; margin-top: 10px; font-size: 14px; }
+    .resume-upload input { display: none; }
+    
+    .resume-uploaded {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #E8F5E9;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    
+    .resume-uploaded i { color: #4CAF50; font-size: 24px; }
+    .resume-uploaded span { flex: 1; }
+    
+    .btn {
+      padding: 15px 30px;
+      background: #00796B;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 25px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    
+    .btn:hover { background: #00695C; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    
+    .success-section {
+      text-align: center;
+      padding: 60px 20px;
+    }
+    
+    .success-section i { font-size: 80px; color: #4CAF50; }
+    .success-section h2 { color: #333; margin: 20px 0 15px 0; }
+    .success-section p { color: #666; }
+    
+    .no-jobs {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+    
+    .no-jobs i { font-size: 60px; color: #ccc; margin-bottom: 15px; }
+    
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    
+    .loading-overlay.active { display: flex; }
+    
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid #f3f3f3;
+      border-top: 5px solid #00796B;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Career Application</h1>
+      <p>Join our team and make a difference</p>
+    </div>
+
+    <div class="form-container" id="form-container">
+      
+      <!-- Show specific job if jobId provided -->
+      <? if(jobDetails) { ?>
+        <div class="job-card">
+          <h3><?= jobDetails['Job Title'] || 'Position' ?></h3>
+          <p><strong>Department:</strong> <?= jobDetails['Department'] || 'N/A' ?></p>
+          <p><strong>Location:</strong> <?= jobDetails['Location'] || 'N/A' ?></p>
+          <p><strong>Experience:</strong> <?= jobDetails['Experience Required'] || 'Not specified' ?></p>
+          <span class="job-tag"><?= jobDetails['Employment Type'] || 'Full-time' ?></span>
+        </div>
+        <input type="hidden" id="selectedJobId" value="<?= jobDetails['Job ID'] ?>">
+      
+      <!-- Show job selection if no specific job -->
+      <? } else if(openJobs && openJobs.length > 0) { ?>
+        <h3 class="section-title">Select a Position</h3>
+        <div class="jobs-list">
+          <? for(var i = 0; i < openJobs.length; i++) { ?>
+            <div class="job-option" onclick="selectJob('<?= openJobs[i]['Job ID'] ?>', this)">
+              <h4><?= openJobs[i]['Job Title'] || 'Position' ?></h4>
+              <p><?= openJobs[i]['Department'] || '' ?> | <?= openJobs[i]['Location'] || '' ?> | <?= openJobs[i]['Employment Type'] || 'Full-time' ?></p>
+            </div>
+          <? } ?>
+        </div>
+        <input type="hidden" id="selectedJobId" value="">
+      
+      <!-- No jobs available -->
+      <? } else { ?>
+        <div class="no-jobs">
+          <i class="material-icons">work_off</i>
+          <h2>No Open Positions</h2>
+          <p>There are currently no open positions. Please check back later.</p>
+        </div>
+      <? } ?>
+
+      <!-- Application Form (only show if jobs exist) -->
+      <? if((jobDetails) || (openJobs && openJobs.length > 0)) { ?>
+      <form id="application-form" onsubmit="submitApplication(event)">
+        
+        <h3 class="section-title">Personal Information</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>First Name *</label>
+            <input type="text" id="firstName" required>
+          </div>
+          <div class="form-group">
+            <label>Last Name *</label>
+            <input type="text" id="lastName" required>
+          </div>
+          <div class="form-group">
+            <label>Email *</label>
+            <input type="email" id="email" required>
+          </div>
+          <div class="form-group">
+            <label>Phone *</label>
+            <input type="tel" id="phone" required pattern="[0-9]{10}">
+          </div>
+          <div class="form-group">
+            <label>Current Location</label>
+            <input type="text" id="location">
+          </div>
+        </div>
+
+        <h3 class="section-title">Professional Information</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Current Company</label>
+            <input type="text" id="currentCompany">
+          </div>
+          <div class="form-group">
+            <label>Current Designation</label>
+            <input type="text" id="currentDesignation">
+          </div>
+          <div class="form-group">
+            <label>Total Experience *</label>
+            <select id="totalExperience" required>
+              <option value="">Select Experience</option>
+              <option value="Fresher">Fresher</option>
+              <option value="0-1 years">0-1 years</option>
+              <option value="1-3 years">1-3 years</option>
+              <option value="3-5 years">3-5 years</option>
+              <option value="5-8 years">5-8 years</option>
+              <option value="8-10 years">8-10 years</option>
+              <option value="10+ years">10+ years</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Notice Period *</label>
+            <select id="noticePeriod" required>
+              <option value="">Select Notice Period</option>
+              <option value="Immediate">Immediate</option>
+              <option value="15 days">15 days</option>
+              <option value="30 days">30 days</option>
+              <option value="60 days">60 days</option>
+              <option value="90 days">90 days</option>
+              <option value="More than 90 days">More than 90 days</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Current CTC (LPA)</label>
+            <input type="text" id="currentCtc" placeholder="e.g., 8.5">
+          </div>
+          <div class="form-group">
+            <label>Expected CTC (LPA)</label>
+            <input type="text" id="expectedCtc" placeholder="e.g., 12">
+          </div>
+        </div>
+
+        <h3 class="section-title">Resume</h3>
+        <div class="form-group">
+          <div class="resume-upload" id="resume-upload-area" onclick="document.getElementById('resume').click()">
+            <i class="material-icons">cloud_upload</i>
+            <p>Click to upload your resume<br>(PDF, DOC, DOCX - Max 5MB)</p>
+            <input type="file" id="resume" accept=".pdf,.doc,.docx" onchange="handleResumeUpload(this)" required>
+          </div>
+          <div id="resume-preview"></div>
+        </div>
+
+        <div class="form-group">
+          <label>Cover Letter / Additional Information</label>
+          <textarea id="coverLetter" rows="4" placeholder="Tell us why you're interested in this position..."></textarea>
+        </div>
+
+        <button type="submit" class="btn" id="submitBtn">
+          <i class="material-icons">send</i> Submit Application
+        </button>
+      </form>
+      <? } ?>
+    </div>
+
+    <!-- Success Message -->
+    <div id="success-container" style="display:none">
+      <div class="success-section">
+        <i class="material-icons">check_circle</i>
+        <h2>Application Submitted!</h2>
+        <p>Thank you for applying. We will review your application and get back to you soon.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+  </div>
+
+  <script>
+    var resumeData = null;
+
+    function selectJob(jobId, element) {
+      document.querySelectorAll('.job-option').forEach(function(el) {
+        el.classList.remove('selected');
+      });
+      element.classList.add('selected');
+      document.getElementById('selectedJobId').value = jobId;
+    }
+
+    function handleResumeUpload(input) {
+      var file = input.files[0];
+      if (!file) return;
+
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size should be less than 5MB');
+        input.value = '';
+        return;
+      }
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        resumeData = {
+          fileName: file.name,
+          mimeType: file.type,
+          content: e.target.result.split(',')[1]
+        };
+        
+        document.getElementById('resume-upload-area').style.display = 'none';
+        document.getElementById('resume-preview').innerHTML = 
+          '<div class="resume-uploaded">' +
+          '<i class="material-icons">description</i>' +
+          '<span>' + file.name + '</span>' +
+          '<i class="material-icons" style="cursor:pointer;color:#f44336" onclick="removeResume()">close</i>' +
+          '</div>';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeResume() {
+      resumeData = null;
+      document.getElementById('resume').value = '';
+      document.getElementById('resume-upload-area').style.display = 'block';
+      document.getElementById('resume-preview').innerHTML = '';
+    }
+
+    function submitApplication(event) {
+      event.preventDefault();
+
+      var jobId = document.getElementById('selectedJobId').value;
+      if (!jobId) {
+        alert('Please select a position to apply for.');
+        return;
+      }
+
+      if (!resumeData) {
+        alert('Please upload your resume.');
+        return;
+      }
+
+      document.getElementById('loading').classList.add('active');
+      document.getElementById('submitBtn').disabled = true;
+
+      var applicationData = {
+        jobId: jobId,
+        firstName: document.getElementById('firstName').value,
+        lastName: document.getElementById('lastName').value,
+        email: document.getElementById('email').value,
+        phone: document.getElementById('phone').value,
+        location: document.getElementById('location').value,
+        currentCompany: document.getElementById('currentCompany').value,
+        currentDesignation: document.getElementById('currentDesignation').value,
+        totalExperience: document.getElementById('totalExperience').value,
+        currentCtc: document.getElementById('currentCtc').value,
+        expectedCtc: document.getElementById('expectedCtc').value,
+        noticePeriod: document.getElementById('noticePeriod').value,
+        coverLetter: document.getElementById('coverLetter').value,
+        resume: resumeData,
+        source: 'Career Portal'
+      };
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          document.getElementById('loading').classList.remove('active');
+          if (result.success) {
+            document.getElementById('form-container').style.display = 'none';
+            document.getElementById('success-container').style.display = 'block';
+          } else {
+            alert('Error: ' + (result.error || 'Unknown error'));
+            document.getElementById('submitBtn').disabled = false;
+          }
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('loading').classList.remove('active');
+          alert('Error: ' + error);
+          document.getElementById('submitBtn').disabled = false;
+        })
+        .submitCandidateApplication(applicationData);
+    }
+  </script>
+</body>
+</html>
