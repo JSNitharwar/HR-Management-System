@@ -1,0 +1,713 @@
+<script>
+// ============================================
+// GLOBAL VARIABLES
+// ============================================
+var allEmployees = [];
+var allCandidates = [];
+var allJobs = [];
+var allInterviews = [];
+var allOffers = [];
+var allEntities = [];
+var selectedEmployees = [];
+var currentEntityFilter = '';
+var currentEditEmployee = null;
+var currentViewCandidateId = null;
+
+// ============================================
+// INITIALIZATION
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('HR System Initialized');
+  
+  document.querySelectorAll('.nav-item').forEach(function(item) {
+    item.addEventListener('click', function() {
+      navigateToSection(this.getAttribute('data-section'));
+    });
+  });
+  
+  loadDashboardData();
+});
+
+// ============================================
+// NAVIGATION
+// ============================================
+function navigateToSection(section) {
+  document.querySelectorAll('.nav-item').forEach(function(item) {
+    item.classList.remove('active');
+    if (item.getAttribute('data-section') === section) {
+      item.classList.add('active');
+    }
+  });
+
+  document.querySelectorAll('.section').forEach(function(sec) {
+    sec.classList.remove('active');
+  });
+  
+  var sectionEl = document.getElementById(section + '-section');
+  if (sectionEl) {
+    sectionEl.classList.add('active');
+  }
+
+  var titles = {
+    dashboard: 'Dashboard',
+    employees: 'Employee Management',
+    recruitment: 'Candidates',
+    jobs: 'Job Postings',
+    interviews: 'Interviews',
+    offers: 'Offer Letters',
+    settings: 'Settings'
+  };
+  document.getElementById('page-title').textContent = titles[section] || 'Dashboard';
+
+  switch(section) {
+    case 'dashboard': loadDashboardData(); break;
+    case 'employees': loadEmployees(); break;
+    case 'recruitment': loadCandidates(); break;
+    case 'jobs': loadJobs(); break;
+    case 'interviews': loadInterviews(); break;
+    case 'offers': loadOffers(); break;
+    case 'settings': loadEntities(); break;
+  }
+
+  document.getElementById('sidebar').classList.remove('active');
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('active');
+}
+
+// ============================================
+// OFFERS SECTION (NEW)
+// ============================================
+function loadOffers() {
+  var tbody = document.getElementById('offers-tbody');
+  tbody.innerHTML = '<tr><td colspan="8" class="loading-cell">Loading offers...</td></tr>';
+  
+  google.script.run
+    .withSuccessHandler(function(offers) {
+      allOffers = offers || [];
+      renderOffersTable(allOffers);
+    })
+    .withFailureHandler(function(error) {
+      tbody.innerHTML = '<tr><td colspan="8" class="loading-cell" style="color:#ff416c;">Error loading offers</td></tr>';
+    })
+    .getAllOffers({});
+}
+
+function renderOffersTable(offers) {
+  var tbody = document.getElementById('offers-tbody');
+  
+  if (!offers || offers.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="loading-cell">No offer letters found. <a href="javascript:void(0)" onclick="showCreateOfferModal()">Create first offer</a></td></tr>';
+    return;
+  }
+
+  var html = '';
+  offers.forEach(function(offer) {
+    var statusClass = 'status-' + (offer['Status'] || 'Draft');
+    var ctc = parseFloat(offer['CTC Annual']) || 0;
+    var joiningDate = offer['Joining Date'] ? formatDisplayDate(offer['Joining Date']) : '-';
+    var offerDate = offer['Offer Date'] ? formatDisplayDate(offer['Offer Date']) : '-';
+    
+    html += '<tr>' +
+      '<td><strong>' + (offer['Offer ID'] || '-') + '</strong></td>' +
+      '<td>' + (offer.candidateName || '-') + '</td>' +
+      '<td>' + (offer['Designation'] || '-') + '</td>' +
+      '<td>₹ ' + formatNumber(ctc) + '</td>' +
+      '<td>' + joiningDate + '</td>' +
+      '<td>' + offerDate + '</td>' +
+      '<td><span class="status-badge ' + statusClass + '">' + (offer['Status'] || 'Draft') + '</span></td>' +
+      '<td>' +
+      '<div class="action-icons">' +
+      '<button class="action-icon view" onclick="viewOffer(\'' + offer['Offer ID'] + '\')" title="View"><i class="material-icons">visibility</i></button>';
+    
+    if (offer['Status'] === 'Draft') {
+      html += '<button class="action-icon offer" onclick="sendOffer(\'' + offer['Offer ID'] + '\')" title="Send Offer"><i class="material-icons">send</i></button>';
+    }
+    
+    if (offer['Status'] === 'Sent') {
+      html += '<button class="action-icon edit" onclick="markOfferAccepted(\'' + offer['Offer ID'] + '\')" title="Mark Accepted"><i class="material-icons">check_circle</i></button>';
+      html += '<button class="action-icon delete" onclick="markOfferRejected(\'' + offer['Offer ID'] + '\')" title="Mark Rejected"><i class="material-icons">cancel</i></button>';
+    }
+    
+    if (offer['Status'] === 'Accepted') {
+      html += '<button class="action-icon offer" onclick="convertToEmployee(\'' + offer['Offer ID'] + '\')" title="Convert to Employee"><i class="material-icons">person_add</i></button>';
+    }
+    
+    html += '</div></td></tr>';
+  });
+  
+  tbody.innerHTML = html;
+}
+
+function filterOffers() {
+  var status = document.getElementById('offer-status-filter').value;
+  var search = document.getElementById('offer-search').value.toLowerCase();
+  
+  var filtered = allOffers.filter(function(offer) {
+    if (status && offer['Status'] !== status) return false;
+    if (search) {
+      var searchStr = ((offer.candidateName || '') + ' ' + (offer['Designation'] || '') + ' ' + (offer['Offer ID'] || '')).toLowerCase();
+      if (searchStr.indexOf(search) === -1) return false;
+    }
+    return true;
+  });
+  
+  renderOffersTable(filtered);
+}
+
+// Show Create Offer Modal
+function showCreateOfferModal(candidateId) {
+  document.getElementById('create-offer-form').reset();
+  document.getElementById('offer-candidate-id').value = candidateId || '';
+  
+  // Reset tabs
+  document.querySelectorAll('#create-offer-modal .tab-btn').forEach(function(btn) {
+    btn.classList.remove('active');
+  });
+  document.querySelectorAll('#create-offer-modal .tab-content').forEach(function(tab) {
+    tab.classList.remove('active');
+  });
+  document.querySelector('#create-offer-modal .tab-btn').classList.add('active');
+  document.getElementById('offer-details-tab').classList.add('active');
+  
+  if (candidateId) {
+    loadCandidateForOffer(candidateId);
+  } else {
+    document.getElementById('offer-candidate-name').textContent = 'Please select a candidate from Recruitment section';
+    document.getElementById('offer-candidate-job').textContent = '';
+  }
+  
+  // Load dropdowns
+  loadOfferDropdowns();
+  
+  // Set default dates
+  var today = new Date();
+  var joiningDate = new Date(today);
+  joiningDate.setDate(joiningDate.getDate() + 30);
+  var validityDate = new Date(today);
+  validityDate.setDate(validityDate.getDate() + 7);
+  
+  document.getElementById('offer-joining-date').value = formatDateForInput(joiningDate);
+  document.getElementById('offer-validity-date').value = formatDateForInput(validityDate);
+  
+  openModal('create-offer-modal');
+}
+
+function loadCandidateForOffer(candidateId) {
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.success) {
+        var candidate = result.candidate;
+        var job = result.job;
+        
+        document.getElementById('offer-candidate-name').textContent = candidate['First Name'] + ' ' + candidate['Last Name'];
+        document.getElementById('offer-candidate-job').textContent = job ? job['Job Title'] : 'Position not specified';
+        
+        // Pre-fill from job
+        if (job) {
+          document.getElementById('offer-designation').value = job['Job Title'] || '';
+          document.getElementById('offer-department').value = job['Department'] || '';
+          document.getElementById('offer-location').value = job['Location'] || '';
+          document.getElementById('offer-employment-type').value = job['Employment Type'] || 'Full-time';
+        }
+        
+        // Populate dropdowns
+        populateOfferDropdowns(result);
+      }
+    })
+    .getCandidateForOffer(candidateId);
+}
+
+function loadOfferDropdowns() {
+  google.script.run
+    .withSuccessHandler(function(entities) {
+      var select = document.getElementById('offer-entity');
+      var options = '<option value="">Select Entity</option>';
+      entities.forEach(function(e) {
+        options += '<option value="' + e['Entity Name'] + '">' + e['Entity Name'] + '</option>';
+      });
+      select.innerHTML = options;
+    })
+    .getLegalEntities();
+  
+  google.script.run
+    .withSuccessHandler(function(managers) {
+      var select = document.getElementById('offer-manager');
+      var options = '<option value="">Select Manager</option>';
+      managers.forEach(function(m) {
+        options += '<option value="' + m.name + '">' + m.name + (m.designation ? ' (' + m.designation + ')' : '') + '</option>';
+      });
+      select.innerHTML = options;
+    })
+    .getManagers();
+}
+
+function populateOfferDropdowns(data) {
+  if (data.entities && data.entities.length > 0) {
+    var entitySelect = document.getElementById('offer-entity');
+    var entityOptions = '<option value="">Select Entity</option>';
+    data.entities.forEach(function(e) {
+      var selected = data.job && data.job['Legal Entity'] === e['Entity Name'] ? ' selected' : '';
+      entityOptions += '<option value="' + e['Entity Name'] + '"' + selected + '>' + e['Entity Name'] + '</option>';
+    });
+    entitySelect.innerHTML = entityOptions;
+  }
+  
+  if (data.managers && data.managers.length > 0) {
+    var managerSelect = document.getElementById('offer-manager');
+    var managerOptions = '<option value="">Select Manager</option>';
+    data.managers.forEach(function(m) {
+      managerOptions += '<option value="' + m.name + '">' + m.name + (m.designation ? ' (' + m.designation + ')' : '') + '</option>';
+    });
+    managerSelect.innerHTML = managerOptions;
+  }
+}
+
+function switchOfferTab(tabId, btn) {
+  document.querySelectorAll('#create-offer-modal .tab-btn').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  document.querySelectorAll('#create-offer-modal .tab-content').forEach(function(c) {
+    c.classList.remove('active');
+  });
+  
+  btn.classList.add('active');
+  document.getElementById(tabId).classList.add('active');
+  
+  if (tabId === 'offer-preview-tab') {
+    generateOfferPreview();
+  }
+}
+
+function calculateOfferSalary() {
+  var ctcAnnual = parseFloat(document.getElementById('offer-ctc-annual').value) || 0;
+  var ctcMonthly = ctcAnnual / 12;
+  
+  document.getElementById('offer-ctc-monthly').value = Math.round(ctcMonthly * 100) / 100;
+  updateOfferSalaryDisplay();
+}
+
+function autoCalculateOfferSalary() {
+  var ctcAnnual = parseFloat(document.getElementById('offer-ctc-annual').value) || 0;
+  
+  if (ctcAnnual <= 0) {
+    showToast('Please enter CTC Annual first', 'warning');
+    return;
+  }
+  
+  var ctcMonthly = ctcAnnual / 12;
+  var basic = Math.round(ctcMonthly * 0.40 * 100) / 100;
+  var hra = Math.round(basic * 0.50 * 100) / 100;
+  var others = Math.round((ctcMonthly - basic - hra) * 100) / 100;
+  
+  document.getElementById('offer-ctc-monthly').value = Math.round(ctcMonthly * 100) / 100;
+  document.getElementById('offer-basic').value = basic;
+  document.getElementById('offer-hra').value = hra;
+  document.getElementById('offer-other-allowances').value = others > 0 ? others : 0;
+  
+  updateOfferSalaryDisplay();
+  showToast('Salary components calculated', 'success');
+}
+
+function updateOfferSalaryDisplay() {
+  var ctc = parseFloat(document.getElementById('offer-ctc-annual').value) || 0;
+  var monthly = parseFloat(document.getElementById('offer-ctc-monthly').value) || 0;
+  var basic = parseFloat(document.getElementById('offer-basic').value) || 0;
+  
+  document.getElementById('offer-ctc-display').textContent = '₹ ' + formatNumber(ctc);
+  document.getElementById('offer-monthly-display').textContent = '₹ ' + formatNumber(monthly);
+  document.getElementById('offer-basic-display').textContent = '₹ ' + formatNumber(basic);
+}
+
+function generateOfferPreview() {
+  var candidateName = document.getElementById('offer-candidate-name').textContent;
+  var designation = document.getElementById('offer-designation').value || '-';
+  var department = document.getElementById('offer-department').value || '-';
+  var location = document.getElementById('offer-location').value || '-';
+  var employmentType = document.getElementById('offer-employment-type').value || '-';
+  var joiningDate = document.getElementById('offer-joining-date').value || '-';
+  var ctc = parseFloat(document.getElementById('offer-ctc-annual').value) || 0;
+  var entity = document.getElementById('offer-entity').value || '-';
+  
+  var html = '' +
+    '<div class="offer-detail-item"><label>Candidate</label><span>' + candidateName + '</span></div>' +
+    '<div class="offer-detail-item"><label>Designation</label><span>' + designation + '</span></div>' +
+    '<div class="offer-detail-item"><label>Department</label><span>' + department + '</span></div>' +
+    '<div class="offer-detail-item"><label>Location</label><span>' + location + '</span></div>' +
+    '<div class="offer-detail-item"><label>Employment Type</label><span>' + employmentType + '</span></div>' +
+    '<div class="offer-detail-item"><label>Joining Date</label><span>' + joiningDate + '</span></div>' +
+    '<div class="offer-detail-item"><label>Annual CTC</label><span style="color:#11998e;font-size:18px;">₹ ' + formatNumber(ctc) + '</span></div>' +
+    '<div class="offer-detail-item"><label>Legal Entity</label><span>' + entity + '</span></div>';
+  
+  document.getElementById('offer-preview-content').innerHTML = html;
+}
+
+function saveOfferAsDraft() {
+  submitOfferForm(false);
+}
+
+function submitCreateOffer(event) {
+  event.preventDefault();
+  submitOfferForm(true);
+}
+
+function submitOfferForm(sendImmediately) {
+  var candidateId = document.getElementById('offer-candidate-id').value;
+  
+  if (!candidateId) {
+    showToast('Please select a candidate first', 'error');
+    return;
+  }
+  
+  showLoading();
+  
+  var offerData = {
+    candidateId: candidateId,
+    legalEntity: document.getElementById('offer-entity').value,
+    designation: document.getElementById('offer-designation').value,
+    department: document.getElementById('offer-department').value,
+    workLocation: document.getElementById('offer-location').value,
+    employmentType: document.getElementById('offer-employment-type').value,
+    reportingManager: document.getElementById('offer-manager').value,
+    ctcAnnual: document.getElementById('offer-ctc-annual').value,
+    basicSalary: document.getElementById('offer-basic').value,
+    hra: document.getElementById('offer-hra').value,
+    otherAllowances: document.getElementById('offer-other-allowances').value,
+    joiningDate: document.getElementById('offer-joining-date').value,
+    probationPeriod: document.getElementById('offer-probation').value,
+    validityDate: document.getElementById('offer-validity-date').value,
+    acceptanceDeadline: document.getElementById('offer-acceptance-deadline').value
+  };
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.success) {
+        if (sendImmediately) {
+          // Send the offer
+          google.script.run
+            .withSuccessHandler(function(sendResult) {
+              hideLoading();
+              if (sendResult.success) {
+                closeModal('create-offer-modal');
+                showToast('Offer letter sent successfully!', 'success');
+                loadOffers();
+                loadCandidates();
+              } else {
+                showToast('Offer created but send failed: ' + sendResult.error, 'warning');
+              }
+            })
+            .withFailureHandler(function(error) {
+              hideLoading();
+              showToast('Error sending offer: ' + error, 'error');
+            })
+            .sendOfferLetter(result.offerId);
+        } else {
+          hideLoading();
+          closeModal('create-offer-modal');
+          showToast('Offer saved as draft', 'success');
+          loadOffers();
+        }
+      } else {
+        hideLoading();
+        showToast('Error: ' + result.error, 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('Error: ' + error, 'error');
+    })
+    .createOffer(offerData);
+}
+
+function viewOffer(offerId) {
+  showLoading();
+  
+  google.script.run
+    .withSuccessHandler(function(offer) {
+      hideLoading();
+      if (offer) {
+        displayOfferDetails(offer);
+        openModal('view-offer-modal');
+      } else {
+        showToast('Offer not found', 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('Error: ' + error, 'error');
+    })
+    .getOfferById(offerId);
+}
+
+function displayOfferDetails(offer) {
+  document.getElementById('view-offer-id').textContent = 'Offer ID: ' + offer['Offer ID'];
+  
+  var ctc = parseFloat(offer['CTC Annual']) || 0;
+  var statusClass = 'status-' + (offer['Status'] || 'Draft');
+  
+  var html = '' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:25px;">' +
+    '<div>' +
+    '<h3 style="font-size:22px;color:#1a1a2e;">' + (offer.candidateName || 'Unknown') + '</h3>' +
+    '<p style="color:#888;">' + (offer.candidateEmail || '') + '</p>' +
+    '</div>' +
+    '<span class="status-badge ' + statusClass + '" style="font-size:14px;padding:8px 16px;">' + (offer['Status'] || 'Draft') + '</span>' +
+    '</div>' +
+    
+    '<div style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;border-radius:16px;padding:25px;text-align:center;margin-bottom:25px;">' +
+    '<p style="opacity:0.9;margin-bottom:8px;">Annual CTC</p>' +
+    '<p style="font-size:32px;font-weight:700;">₹ ' + formatNumber(ctc) + '</p>' +
+    '</div>' +
+    
+    '<div class="offer-detail-grid">' +
+    '<div class="offer-detail-item"><label>Designation</label><span>' + (offer['Designation'] || '-') + '</span></div>' +
+    '<div class="offer-detail-item"><label>Department</label><span>' + (offer['Department'] || '-') + '</span></div>' +
+    '<div class="offer-detail-item"><label>Work Location</label><span>' + (offer['Work Location'] || '-') + '</span></div>' +
+    '<div class="offer-detail-item"><label>Employment Type</label><span>' + (offer['Employment Type'] || '-') + '</span></div>' +
+    '<div class="offer-detail-item"><label>Reporting To</label><span>' + (offer['Reporting Manager'] || '-') + '</span></div>' +
+    '<div class="offer-detail-item"><label>Joining Date</label><span>' + formatDisplayDate(offer['Joining Date']) + '</span></div>' +
+    '<div class="offer-detail-item"><label>Probation Period</label><span>' + (offer['Probation Period'] || '-') + '</span></div>' +
+    '<div class="offer-detail-item"><label>Legal Entity</label><span>' + (offer['Legal Entity'] || '-') + '</span></div>' +
+    '</div>';
+  
+  if (offer['Offer Letter URL']) {
+    html += '<div style="margin-top:25px;"><a href="' + offer['Offer Letter URL'] + '" target="_blank" class="btn btn-secondary"><i class="material-icons">description</i> View Offer Letter</a></div>';
+  }
+  
+  document.getElementById('view-offer-content').innerHTML = html;
+  
+  // Update actions based on status
+  var actionsHtml = '<button type="button" class="btn btn-secondary" onclick="closeModal(\'view-offer-modal\')">Close</button>';
+  
+  if (offer['Status'] === 'Draft') {
+    actionsHtml += '<button type="button" class="btn btn-primary" onclick="sendOffer(\'' + offer['Offer ID'] + '\')"><i class="material-icons">send</i> Send Offer</button>';
+  } else if (offer['Status'] === 'Sent') {
+    actionsHtml += '<button type="button" class="btn btn-success" onclick="markOfferAccepted(\'' + offer['Offer ID'] + '\')"><i class="material-icons">check</i> Mark Accepted</button>';
+    actionsHtml += '<button type="button" class="btn btn-danger" onclick="markOfferRejected(\'' + offer['Offer ID'] + '\')"><i class="material-icons">close</i> Mark Rejected</button>';
+  } else if (offer['Status'] === 'Accepted') {
+    actionsHtml += '<button type="button" class="btn btn-success" onclick="convertToEmployee(\'' + offer['Offer ID'] + '\')"><i class="material-icons">person_add</i> Convert to Employee</button>';
+  }
+  
+  document.getElementById('view-offer-actions').innerHTML = actionsHtml;
+}
+
+function sendOffer(offerId) {
+  if (!confirm('Send offer letter to the candidate?')) return;
+  
+  showLoading();
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideLoading();
+      if (result.success) {
+        showToast('Offer letter sent successfully!', 'success');
+        closeModal('view-offer-modal');
+        loadOffers();
+        loadCandidates();
+      } else {
+        showToast('Error: ' + result.error, 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('Error: ' + error, 'error');
+    })
+    .sendOfferLetter(offerId);
+}
+
+function markOfferAccepted(offerId) {
+  var notes = prompt('Any notes about acceptance?');
+  
+  showLoading();
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideLoading();
+      if (result.success) {
+        showToast('Offer marked as accepted!', 'success');
+        closeModal('view-offer-modal');
+        loadOffers();
+        loadCandidates();
+      } else {
+        showToast('Error: ' + result.error, 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('Error: ' + error, 'error');
+    })
+    .acceptOffer(offerId, notes || '');
+}
+
+function markOfferRejected(offerId) {
+  var notes = prompt('Reason for rejection?');
+  
+  showLoading();
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideLoading();
+      if (result.success) {
+        showToast('Offer marked as rejected', 'warning');
+        closeModal('view-offer-modal');
+        loadOffers();
+        loadCandidates();
+      } else {
+        showToast('Error: ' + result.error, 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('Error: ' + error, 'error');
+    })
+    .rejectOffer(offerId, notes || '');
+}
+
+function convertToEmployee(offerId) {
+  if (!confirm('Convert this offer to a new employee record?\n\nThis will create a new employee and send them the joining form.')) return;
+  
+  showLoading();
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideLoading();
+      if (result.success) {
+        showToast('Employee created successfully! ID: ' + result.employeeId, 'success');
+        closeModal('view-offer-modal');
+        loadOffers();
+        loadEmployees();
+        navigateToSection('employees');
+      } else {
+        showToast('Error: ' + result.error, 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('Error: ' + error, 'error');
+    })
+    .convertOfferToEmployee(offerId);
+}
+
+// ============================================
+// UPDATE CANDIDATES TABLE TO SHOW OFFER BUTTON
+// ============================================
+function renderCandidatesTable(candidates) {
+  var tbody = document.getElementById('candidates-tbody');
+  
+  if (!candidates || candidates.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="loading-cell">No candidates found. <a href="javascript:void(0)" onclick="showAddCandidateModal()">Add a candidate</a></td></tr>';
+    return;
+  }
+
+  var html = '';
+  candidates.forEach(function(cand) {
+    var statusClass = 'status-' + (cand['Status'] || 'Applied').replace(/\s+/g, '-');
+    var name = ((cand['First Name'] || '') + ' ' + (cand['Last Name'] || '')).trim() || 'N/A';
+    
+    html += '<tr>' +
+      '<td><strong>' + (cand['Candidate ID'] || '-') + '</strong></td>' +
+      '<td>' + name + '</td>' +
+      '<td>' + (cand['Email'] || '-') + '</td>' +
+      '<td>' + (cand['Phone'] || '-') + '</td>' +
+      '<td>' + (cand.jobTitle || '-') + '</td>' +
+      '<td>' + (cand['Total Experience'] || '-') + '</td>' +
+      '<td><span class="status-badge ' + statusClass + '">' + (cand['Status'] || 'Applied') + '</span></td>' +
+      '<td>' +
+      '<div class="action-icons">' +
+      '<button class="action-icon view" onclick="viewCandidate(\'' + cand['Candidate ID'] + '\')" title="View"><i class="material-icons">visibility</i></button>' +
+      '<button class="action-icon edit" onclick="scheduleInterviewFor(\'' + cand['Candidate ID'] + '\')" title="Schedule Interview"><i class="material-icons">event</i></button>';
+    
+    // Show offer button for Selected candidates
+    if (cand['Status'] === 'Selected' || cand['Status'] === 'Interviewed') {
+      html += '<button class="action-icon offer" onclick="createOfferForCandidate(\'' + cand['Candidate ID'] + '\')" title="Create Offer"><i class="material-icons">description</i></button>';
+    }
+    
+    html += '<button class="action-icon" onclick="updateCandidateStatusPrompt(\'' + cand['Candidate ID'] + '\')" title="Update Status"><i class="material-icons">sync</i></button>' +
+      '</div></td></tr>';
+  });
+  
+  tbody.innerHTML = html;
+}
+
+function createOfferForCandidate(candidateId) {
+  showCreateOfferModal(candidateId);
+}
+
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+function formatNumber(num) {
+  return num.toLocaleString('en-IN', {maximumFractionDigits: 2});
+}
+
+function formatDisplayDate(dateVal) {
+  if (!dateVal) return '-';
+  try {
+    var date = new Date(dateVal);
+    if (isNaN(date.getTime())) return dateVal;
+    return date.toLocaleDateString('en-IN', {day: 'numeric', month: 'short', year: 'numeric'});
+  } catch(e) {
+    return dateVal;
+  }
+}
+
+function formatDateForInput(date) {
+  if (!date) return '';
+  if (typeof date === 'string') date = new Date(date);
+  if (isNaN(date.getTime())) return '';
+  
+  var year = date.getFullYear();
+  var month = String(date.getMonth() + 1).padStart(2, '0');
+  var day = String(date.getDate()).padStart(2, '0');
+  return year + '-' + month + '-' + day;
+}
+
+function openModal(modalId) {
+  document.getElementById(modalId).classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal(modalId) {
+  document.getElementById(modalId).classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('modal')) {
+    e.target.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+});
+
+function showToast(message, type) {
+  type = type || 'success';
+  var toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.className = 'toast ' + type + ' show';
+  
+  setTimeout(function() {
+    toast.classList.remove('show');
+  }, 4000);
+}
+
+function showLoading() {
+  document.getElementById('loading-overlay').classList.add('active');
+}
+
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.remove('active');
+}
+
+function switchTab(tabId, btn) {
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+  btn.classList.add('active');
+  document.getElementById(tabId).classList.add('active');
+}
+
+// Include all other existing functions here...
+// (loadDashboardData, loadEmployees, loadCandidates, loadJobs, loadInterviews, loadEntities, etc.)
+// ... (Keep all existing functions from previous JavaScript.html)
+
+</script>
